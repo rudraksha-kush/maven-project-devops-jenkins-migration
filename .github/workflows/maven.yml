@@ -1,5 +1,10 @@
 name: Maven Build and Deliver
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 on:
   push:
     branches: [ main, master, develop ]
@@ -21,6 +26,11 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
+    - name: Show Java & Maven versions
+      run: |
+        java -version
+        mvn -v
+
     - name: Build with Maven (skip tests)
       run: mvn -B -DskipTests clean package
 
@@ -36,10 +46,15 @@ jobs:
 
     - name: Publish test results
       uses: EnricoMi/publish-unit-test-result-action@v2
-      if: always()
+      if: |
+        always() && (
+          github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        )
       with:
         files: target/surefire-reports/*.xml
+        github_token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Deliver
-      if: success()        # <-- prevents delivery when build/tests fail
+      if: success()
       run: bash ./jenkins/scripts/deliver.sh
